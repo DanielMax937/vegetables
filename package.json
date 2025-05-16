@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mendable/firecrawl-js": "^1.24.0",
     "next": "15.3.2",
     "openai": "^4.98.0",
     "react": "^19.0.0",

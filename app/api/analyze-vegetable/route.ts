@@ -30,10 +30,17 @@ export async function POST(request: Request) {
           content: [
             { 
               type: "text", 
-              text: `分析这张食物（蔬菜、水果或肉类）的图片，并告诉我它是否新鲜。
-              请用中文回答，并按照以下JSON格式返回响应：
+              text: `首先判断这张图片是否包含食物（蔬菜、水果或肉类）。
+              如果不是食物图片，请返回以下JSON格式：
               {
-                "itemType": "蔬菜/水果/肉类/等",
+                "isFood": false,
+                "message": "这不是食物图片，请上传蔬菜、水果或肉类的图片进行新鲜度分析。"
+              }
+              
+              如果是食物图片，请分析它具体是什么，是否新鲜，并按照以下JSON格式返回响应：
+              {
+                "isFood": true,
+                "itemType": "青菜/苹果/猪肉/等",
                 "isFresh": true/false,
                 "summary": "简短的总体评估",
                 "goodFeatures": ["特征1", "特征2", ...],
