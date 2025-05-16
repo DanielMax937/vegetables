@@ -26,9 +26,8 @@ export async function POST(request: Request) {
 
     // Use Serper API to search for recipe
     const searchResults = await searchRecipeWithSerper(recipeName);
-
     // Check if we have xiachufang.com results
-    const xiachufangUrl = findXiachufangUrl(searchResults);
+    const xiachufangUrl = findXiachufangUrl(searchResults[0]);
 
     if (xiachufangUrl) {
       try {
@@ -64,7 +63,7 @@ export async function POST(request: Request) {
           请确保步骤清晰、详细，并包含有用的烹饪小贴士。`
         }
       ],
-      max_tokens: 1000,
+      max_tokens: 4000,
       response_format: { type: "json_object" }
     });
 
@@ -106,6 +105,28 @@ function findXiachufangUrl(searchResults: any): string | null {
   }
 }
 
+// Convert image URL to base64
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    
+    // Get the content type from the response
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.error('Error converting image to base64:', error);
+    return null;
+  }
+}
+
 // Crawl xiachufang.com recipe using Firecrawl and LLM
 async function crawlXiachufangRecipe(url: string) {
   try {
@@ -122,7 +143,6 @@ async function crawlXiachufangRecipe(url: string) {
     }
 
     const firecrawlData = crawlResponse.data[0].markdown;
-    console.log(firecrawlData)
     // Use LLM to extract structured recipe data from Firecrawl result
     const llmResponse = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -149,7 +169,7 @@ async function crawlXiachufangRecipe(url: string) {
           }`
         }
       ],
-      max_tokens: 1500,
+      max_tokens: 4000,
       response_format: { type: "json_object" }
     });
 
@@ -166,20 +186,27 @@ async function crawlXiachufangRecipe(url: string) {
         return step.text;
       });
 
-      // Collect all step images
-      const stepImages = extractedData.steps
+      // Collect all step images and convert to base64
+      const stepImagesUrls = extractedData.steps
         .filter((step: any) => step.imageUrl)
         .map((step: any) => step.imageUrl);
-
+      // Convert all image URLs to base64
+      const stepImagesPromises = stepImagesUrls.map(imageUrlToBase64);
+      const stepImages = await Promise.all(stepImagesPromises);
+      
       // Get cover image from Firecrawl data if available
       let coverImageUrl = null;
+      // If there's at least one step image, use the first one as cover
+      if (stepImages.length > 0) {
+        coverImageUrl = stepImages[stepImages.length-1];
+      }
 
       return {
         name: extractedData.name,
         imageUrl: coverImageUrl,
         ingredients: extractedData.ingredients,
         steps: formattedSteps,
-        stepImages: stepImages,
+        stepImages: stepImages, // Filter out any null values
         tips: extractedData.tips && extractedData.tips.length > 0 ? extractedData.tips : ["暂无小贴士"]
       };
     } catch (parseError) {
@@ -208,27 +235,26 @@ async function crawlXiachufangRecipe(url: string) {
 // Real Serper API implementation
 async function searchRecipeWithSerper(recipeName: string) {
   try {
-    const response = await fetch('https://google.serper.dev/search', {
+    const payload = [
+      {
+        "q": recipeName  + ' 食谱 做法 步骤 site: xiachufang.com',
+        "location": "China",
+        "gl": "cn",
+        "hl": "zh-cn"
+      },
+    ];
+
+    const options = {
       method: 'POST',
       headers: {
         'X-API-KEY': serperApiKey || '',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify([{
-        q: `${recipeName} 食谱 做法 步骤 site:xiachufang.com`,
-        location: "China",
-        gl: 'cn',
-        hl: 'zh-cn',
-        num: 5
-      }])
-    });
+      body: JSON.stringify(payload)
+    };
 
-    if (!response.ok) {
-      console.log(response)
-      throw new Error(`Serper API error: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const response = await fetch('https://google.serper.dev/search', options)
+    const data = await response.json()
     return data;
   } catch (error) {
     console.error('Error searching with Serper:', error);

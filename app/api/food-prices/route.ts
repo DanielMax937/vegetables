@@ -19,7 +19,7 @@ export async function GET() {
     }
 
     // Extract all links from the page
-    const html = crawlResponse.data[0].html;
+    const html:any = crawlResponse.data[0].html;
     const linkRegex = /<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
     const links = [];
     let match;
@@ -48,8 +48,8 @@ export async function GET() {
 
     // Sort links by the date in the URL (format: /fgw/jbsj/YYYYMMDD/xxxxx.html)
     links.sort((a, b) => {
-      const dateA = extractDateFromUrl(a.url);
-      const dateB = extractDateFromUrl(b.url);
+      const dateA:any = extractDateFromUrl(a.url);
+      const dateB:any = extractDateFromUrl(b.url);
       
       if (dateA && dateB) {
         return dateB.getTime() - dateA.getTime();
@@ -80,10 +80,10 @@ export async function GET() {
     }
 
     // Extract price data
-    const pricePageContent = pricePageResponse.data[0].markdown || pricePageResponse.data[0].html;
+    // const pricePageContent = pricePageResponse.data[0].markdown || pricePageResponse.data[0].html;
     
     // Extract tables from the content
-    const tables = extractTables(pricePageResponse.data[0].html);
+    const tables = extractTables(pricePageResponse.data[0].html!);
 
     return NextResponse.json({
       success: true,

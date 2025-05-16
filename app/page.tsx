@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
-import Link from 'next/link';
 import FoodItemPrice from '../components/FoodItemPrice';
 
 interface AnalysisResult {
@@ -394,7 +393,7 @@ export default function Home() {
                       </div>
                     )}
                     
-                    {recipeDetail.source && (
+                    {/* {recipeDetail.source && (
                       <div className="text-right text-xs text-gray-500 mt-4">
                         <a 
                           href={recipeDetail.source} 
@@ -405,7 +404,7 @@ export default function Home() {
                           来源: 下厨房
                         </a>
                       </div>
-                    )}
+                    )} */}
                   </div>
                 ) : (
                   <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
@@ -434,7 +433,7 @@ export default function Home() {
                     </h2>
                     <p className="text-sm mb-4">{analysis.summary}</p>
                     
-                    <FoodItemPrice foodItem={analysis.itemType} />
+                    <FoodItemPrice foodItem={analysis.itemType!} />
                     
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       {/* Good features */}

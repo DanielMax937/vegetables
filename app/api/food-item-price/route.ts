@@ -1,4 +1,11 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL
+});
 
 export async function POST(request: Request) {
   try {
@@ -50,8 +57,8 @@ export async function POST(request: Request) {
 
     // Sort links by the date in the URL
     links.sort((a, b) => {
-      const dateA = extractDateFromUrl(a.url);
-      const dateB = extractDateFromUrl(b.url);
+      const dateA:any = extractDateFromUrl(a.url);
+      const dateB:any = extractDateFromUrl(b.url);
       
       if (dateA && dateB) {
         return dateB.getTime() - dateA.getTime();
@@ -80,17 +87,9 @@ export async function POST(request: Request) {
     
     // Extract tables from the content
     const tables = extractTables(pricePageHtml);
-    tables.forEach((item:any[])=> {
-      item.forEach((price:any[])=> {
-        price.shift()
-        price = price.map((subItem: string)=> {
-          return subItem.replace("&nbsp;", "");
-        })
-      })
-    })
-    console.log(tables)
-    // Search for the food item in the tables
-    const foodItemPrices = findFoodItemInTables(tables, foodItem);
+    
+    // Search for the food item in the tables using LLM
+    const foodItemPrices = await findFoodItemWithLLM(tables, foodItem);
     
     return NextResponse.json({
       success: true,
@@ -155,7 +154,7 @@ function extractTables(html: string): any[] {
       
       while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
         const cellContent = cellMatch[2].replace(/<[^>]+>/g, '').trim();
-        cells.push(cellContent);
+        cells.push(cellContent.replace("&nbsp;", ""));
       }
       
       if (cells.length > 0) {
@@ -171,7 +170,106 @@ function extractTables(html: string): any[] {
   return tables;
 }
 
-// Helper function to find food item in tables
+// Helper function to find food item in tables using LLM
+async function findFoodItemWithLLM(tables: string[][][], foodItem: string): Promise<any[]> {
+  try {
+    // First do a basic search to find potential matches
+    const potentialMatches = [];
+    
+    for (const table of tables) {
+      if (table.length < 2) continue; // Skip tables without headers
+      
+      const headers = table[0];
+      const nameColumnIndex = findNameColumnIndex(headers);
+      
+      if (nameColumnIndex === -1) continue; // Skip if no name column found
+      
+      // Collect all rows with their headers
+      for (let i = 1; i < table.length; i++) {
+        const row = table[i];
+        if (row.length <= nameColumnIndex) continue;
+        
+        const itemName = row[nameColumnIndex];
+        const rowData = {};
+        
+        // Extract all columns as potential price data
+        for (let j = 0; j < headers.length; j++) {
+          if (j < row.length) {
+            // @ts-ignore
+            rowData[headers[j]] = row[j];
+          }
+        }
+        
+        potentialMatches.push({
+          name: itemName,
+          data: rowData
+        });
+      }
+    }
+    
+    // If no potential matches found, return empty array
+    if (potentialMatches.length === 0) {
+      return [];
+    }
+    // Use LLM to find the best matches and calculate median price
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: `我正在寻找"${foodItem}"的价格信息。以下是从价格表中提取的所有行数据：
+          
+          ${JSON.stringify(potentialMatches, null, 2)}
+          
+          请帮我：
+          1. 找出最可能是"${foodItem}"的项目（考虑同义词、变体等）
+          2. 如果找到多个匹配项，计算价格的中位数
+          3. 返回最终结果
+          
+          请用以下JSON格式返回：
+          {
+            "matches": [
+              {
+                "name": "匹配的名称",
+                "data": { "价格类型1": "价格1", "价格类型2": "价格2", ... }
+              }
+            ],
+            "medianPrice": {
+              "价格类型": "中位数价格",
+              "单位": "元/千克"
+            }
+          }`
+        }
+      ],
+      max_tokens: 4000,
+      response_format: { type: "json_object" }
+    });
+    
+    const llmResult = JSON.parse(response.choices[0]?.message?.content || "{}");
+    // If LLM found matches, return them
+    if (llmResult.matches && llmResult.matches.length > 0) {
+      const priceList: number[] = []
+      Object.keys(llmResult.matches[0].data).forEach((item:string)=> {
+        const price = parseFloat(llmResult.matches[0].data[item]);
+        if(!isNaN(price)) {
+          priceList.push(price)
+        }
+      })
+      
+      llmResult.matches[0].medianPrice = priceList[priceList.length / 2];
+      return [llmResult.matches[0]];
+    }
+    
+    // Fallback to basic matching if LLM didn't find anything
+    return findFoodItemInTables(tables, foodItem);
+  } catch (error) {
+    console.error('Error using LLM for food item matching:', error);
+    // Fallback to basic matching if LLM fails
+    return findFoodItemInTables(tables, foodItem);
+  }
+}
+
+// Helper function to find food item in tables (basic method)
 function findFoodItemInTables(tables: string[][][], foodItem: string): any[] {
   const results = [];
   const searchTerms = generateSearchTerms(foodItem);
@@ -202,6 +300,7 @@ function findFoodItemInTables(tables: string[][][], foodItem: string): any[] {
         // Extract all other columns as potential price data
         for (let j = 0; j < headers.length; j++) {
           if (j !== nameColumnIndex && j < row.length) {
+            // @ts-ignore
             priceInfo.data[headers[j]] = row[j];
           }
         }

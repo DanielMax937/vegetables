@@ -9,6 +9,7 @@ interface FoodItemPriceProps {
 interface PriceInfo {
   name: string;
   data: Record<string, string>;
+  medianPrice?: string;
 }
 
 interface PriceResponse {
@@ -29,10 +30,10 @@ export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
   useEffect(() => {
     const fetchPrice = async () => {
       if (!foodItem) return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetch('/api/food-item-price', {
           method: 'POST',
@@ -41,11 +42,11 @@ export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
           },
           body: JSON.stringify({ foodItem }),
         });
-        
+
         if (!response.ok) {
           throw new Error('获取价格数据失败');
         }
-        
+
         const data = await response.json();
         setPriceData(data);
       } catch (err) {
@@ -55,7 +56,7 @@ export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
         setLoading(false);
       }
     };
-    
+
     fetchPrice();
   }, [foodItem]);
 
@@ -75,43 +76,37 @@ export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
     return null; // Don't show anything if no price data
   }
 
+  // Check if we have median price data
+  // const hasMedianPrice = priceData.prices[0]?.medianPrice && Object.keys(priceData.prices[0].medianPrice).length > 0;
+
   return (
     <div className="mt-2 mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-      <h3 className="text-sm font-semibold mb-2">最新市场价格</h3>
-      
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-xs">
-          <thead>
-            <tr className="bg-gray-100 dark:bg-gray-600">
-              <th className="px-2 py-1 text-left">品名</th>
-              {Object.keys(priceData.prices[0].data).map((key) => (
-                <th key={key} className="px-2 py-1 text-left">{key}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {priceData.prices.map((item, index) => (
-              <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'}>
-                <td className="px-2 py-1 font-medium">{item.name}</td>
-                {Object.values(item.data).map((value, i) => (
-                  <td key={i} className="px-2 py-1">{value}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      
+      <h3 className="text-sm font-semibold mb-2">最新市场价格: {priceData.prices[0].medianPrice} 元/千克</h3>
+
+      {/* {hasMedianPrice && (
+        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900 rounded border border-blue-200 dark:border-blue-800">
+          <p className="text-sm font-medium">推荐参考价格:</p>
+          {Object.entries().map(([key, value]) => (
+            <p key={key} className="text-sm">
+              <span className="font-medium">{key}:</span> {value}
+            </p>
+          ))}
+        </div>
+      )} */}
+
+
       <div className="mt-2 text-right">
         <p className="text-xs text-gray-500">
-          数据来源: {priceData.priceDate} {priceData.priceSource}
+          数据来源: <a
+            href={priceData.priceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-500 hover:underline"
+          >
+            {priceData.priceSource}
+          </a>
         </p>
-        <Link 
-          href="/prices" 
-          className="text-xs text-blue-500 hover:underline"
-        >
-          查看完整价格表 →
-        </Link>
+
       </div>
     </div>
   );
