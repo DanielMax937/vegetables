@@ -22,43 +22,7 @@ interface PriceResponse {
   error?: string;
 }
 
-export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
-  const [priceData, setPriceData] = useState<PriceResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchPrice = async () => {
-      if (!foodItem) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch('/api/food-item-price', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ foodItem }),
-        });
-
-        if (!response.ok) {
-          throw new Error('获取价格数据失败');
-        }
-
-        const data = await response.json();
-        setPriceData(data);
-      } catch (err) {
-        console.error('Error fetching price:', err);
-        setError('无法加载价格数据');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPrice();
-  }, [foodItem]);
+export default function FoodItemPrice({ priceData, loading }: any) {
 
   if (loading) {
     return (
@@ -66,10 +30,6 @@ export default function FoodItemPrice({ foodItem }: FoodItemPriceProps) {
         <p className="text-sm text-gray-500 dark:text-gray-300">正在获取最新价格信息...</p>
       </div>
     );
-  }
-
-  if (error) {
-    return null; // Don't show anything if there's an error
   }
 
   if (!priceData || !priceData.success || priceData.prices.length === 0) {

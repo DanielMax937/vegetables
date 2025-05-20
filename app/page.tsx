@@ -37,6 +37,22 @@ interface RecipesResponse {
   error?: string;
 }
 
+interface PriceInfo {
+  name: string;
+  data: Record<string, string>;
+  medianPrice?: string;
+}
+
+interface PriceResponse {
+  success: boolean;
+  foodItem: string;
+  prices: PriceInfo[];
+  priceDate: string;
+  priceSource: string;
+  priceUrl: string;
+  error?: string;
+}
+
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -52,13 +68,49 @@ export default function Home() {
   const [recipeDetail, setRecipeDetail] = useState<RecipeDetail | null>(null);
   const [loadingRecipeDetail, setLoadingRecipeDetail] = useState(false);
 
+  const [priceData, setPriceData] = useState<PriceResponse | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      if (!analysis?.itemType) return;
+
+      setPriceLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/food-item-price', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ foodItem: analysis?.itemType }),
+        });
+
+        if (!response.ok) {
+          throw new Error('获取价格数据失败');
+        }
+
+        const data = await response.json();
+        setPriceData(data);
+      } catch (err) {
+        console.error('Error fetching price:', err);
+        setError('无法加载价格数据');
+      } finally {
+        setPriceLoading(false);
+      }
+    };
+
+    fetchPrice();
+  }, [analysis?.itemType]);
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
         audio: false,
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setCameraActive(true);
@@ -83,10 +135,10 @@ export default function Home() {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -105,7 +157,7 @@ export default function Home() {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         if (e.target?.result) {
           setPhoto(e.target.result as string);
@@ -118,7 +170,7 @@ export default function Home() {
           }
         }
       };
-      
+
       reader.readAsDataURL(file);
     }
   };
@@ -140,12 +192,12 @@ export default function Home() {
 
   const analyzeVegetable = async () => {
     if (!photo) return;
-    
+
     setAnalyzing(true);
     setRecipes(null);
     setSelectedRecipe(null);
     setRecipeDetail(null);
-    
+
     try {
       const response = await fetch('/api/analyze-vegetable', {
         method: 'POST',
@@ -154,11 +206,11 @@ export default function Home() {
         },
         body: JSON.stringify({ image: photo }),
       });
-      
+
       if (!response.ok) {
         throw new Error('分析图片失败');
       }
-      
+
       const data = await response.json();
       setAnalysis(data);
     } catch (err) {
@@ -175,9 +227,9 @@ export default function Home() {
 
   const getRecipes = async () => {
     if (!analysis?.itemType) return;
-    
+
     setLoadingRecipes(true);
-    
+
     try {
       // Try to get user's location
       let location = null;
@@ -190,22 +242,22 @@ export default function Home() {
       } catch (locationError) {
         console.error('Error getting location:', locationError);
       }
-      
+
       const response = await fetch('/api/get-recipes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           foodItem: analysis.itemType,
           location: location
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error('获取食谱失败');
       }
-      
+
       const data: RecipesResponse = await response.json();
       setRecipes(data.recipes);
     } catch (err) {
@@ -219,7 +271,7 @@ export default function Home() {
   const getRecipeDetail = async (recipeName: string) => {
     setSelectedRecipe(recipeName);
     setLoadingRecipeDetail(true);
-    
+
     try {
       const response = await fetch('/api/recipe-detail', {
         method: 'POST',
@@ -228,11 +280,11 @@ export default function Home() {
         },
         body: JSON.stringify({ recipeName }),
       });
-      
+
       if (!response.ok) {
         throw new Error('获取食谱详情失败');
       }
-      
+
       const data = await response.json();
       setRecipeDetail(data);
     } catch (err) {
@@ -263,26 +315,26 @@ export default function Home() {
       >
         查看最新菜价 →
       </Link> */}
-      
+
       <div className="w-full max-w-md bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
         {!photo ? (
           <>
             <div className="relative aspect-[4/3] bg-black">
-            <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  className="w-full h-full object-cover"
-                  style={{
-                    display: cameraActive ? 'block' : 'none',
-                  }}
-                />
-              {!cameraActive && 
-              (
-                <div className="w-full h-full flex items-center justify-center text-white">
-                  {error ? error : "拍照或从相册选择食材图片"}
-                </div>
-              )}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+                style={{
+                  display: cameraActive ? 'block' : 'none',
+                }}
+              />
+              {!cameraActive &&
+                (
+                  <div className="w-full h-full flex items-center justify-center text-white">
+                    {error ? error : "拍照或从相册选择食材图片"}
+                  </div>
+                )}
             </div>
             <div className="p-4 flex justify-center gap-4">
               {!cameraActive ? (
@@ -299,8 +351,8 @@ export default function Home() {
                   >
                     从相册选择
                   </button>
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     ref={fileInputRef}
                     onChange={handleFileSelect}
                     accept="image/*"
@@ -322,26 +374,26 @@ export default function Home() {
           <>
             {/* Image section */}
             <div className="relative aspect-[4/3] bg-black">
-              <img 
-                src={photo} 
-                alt="拍摄的照片" 
-                className="w-full h-full object-cover" 
+              <img
+                src={photo}
+                alt="拍摄的照片"
+                className="w-full h-full object-cover"
               />
             </div>
-            
+
             {/* Recipe detail view */}
             {selectedRecipe && (
               <div className="p-4 bg-white dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="font-bold text-lg">{selectedRecipe}</h2>
-                  <button 
+                  <button
                     onClick={backToRecipes}
                     className="text-sm text-blue-500"
                   >
                     返回食谱列表
                   </button>
                 </div>
-                
+
                 {loadingRecipeDetail ? (
                   <div className="flex justify-center items-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -350,14 +402,14 @@ export default function Home() {
                   <div>
                     {recipeDetail.imageUrl && (
                       <div className="mb-4">
-                        <img 
-                          src={recipeDetail.imageUrl} 
-                          alt={recipeDetail.name} 
+                        <img
+                          src={recipeDetail.imageUrl}
+                          alt={recipeDetail.name}
                           className="w-full h-auto rounded-lg"
                         />
                       </div>
                     )}
-                    
+
                     <div className="mb-6">
                       <h3 className="font-semibold text-lg mb-2">所需原料</h3>
                       <ul className="list-disc pl-5">
@@ -366,7 +418,7 @@ export default function Home() {
                         ))}
                       </ul>
                     </div>
-                    
+
                     <div className="mb-6">
                       <h3 className="font-semibold text-lg mb-2">烹饪步骤</h3>
                       <ol className="list-decimal pl-5">
@@ -374,9 +426,9 @@ export default function Home() {
                           <li key={`step-${index}`} className="mb-6">
                             <div className="mb-2">{step}</div>
                             {recipeDetail.stepImages && recipeDetail.stepImages[index] && (
-                              <img 
-                                src={recipeDetail.stepImages[index]} 
-                                alt={`步骤${index + 1}`} 
+                              <img
+                                src={recipeDetail.stepImages[index]}
+                                alt={`步骤${index + 1}`}
                                 className="w-full h-auto rounded-lg mb-2"
                               />
                             )}
@@ -384,7 +436,7 @@ export default function Home() {
                         ))}
                       </ol>
                     </div>
-                    
+
                     {recipeDetail.tips && recipeDetail.tips.length > 0 && (
                       <div className="mb-4">
                         <h3 className="font-semibold text-lg mb-2">烹饪小贴士</h3>
@@ -395,7 +447,7 @@ export default function Home() {
                         </ul>
                       </div>
                     )}
-                    
+
                     {/* {recipeDetail.source && (
                       <div className="text-right text-xs text-gray-500 mt-4">
                         <a 
@@ -416,7 +468,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            
+
             {/* Analysis result section */}
             {analysis && !selectedRecipe && (
               <div className="p-4 bg-white dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
@@ -430,14 +482,14 @@ export default function Home() {
                 ) : (
                   <>
                     <h2 className="font-bold text-lg mb-2">
-                      {analysis.itemType} - {analysis.isFresh ? 
-                        <span className="text-green-600">新鲜</span> : 
+                      {analysis.itemType} - {analysis.isFresh ?
+                        <span className="text-green-600">新鲜</span> :
                         <span className="text-red-600">不新鲜</span>}
                     </h2>
                     <p className="text-sm mb-4">{analysis.summary}</p>
-                    
-                    <FoodItemPrice foodItem={analysis.itemType!} />
-                    
+
+                    <FoodItemPrice priceData={priceData} loading={priceLoading} />
+
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       {/* Good features */}
                       <div>
@@ -448,7 +500,7 @@ export default function Home() {
                           ))}
                         </ul>
                       </div>
-                      
+
                       {/* Bad features */}
                       <div>
                         <h3 className="font-semibold text-red-600 mb-2">不新鲜特征:</h3>
@@ -459,7 +511,7 @@ export default function Home() {
                         </ul>
                       </div>
                     </div>
-                    
+
                     {analysis.isFood && analysis.isFresh && !recipes && (
                       <button
                         onClick={getRecipes}
@@ -469,7 +521,7 @@ export default function Home() {
                         {loadingRecipes ? '获取食谱中...' : '获取推荐食谱'}
                       </button>
                     )}
-                    
+
                     {/* Recipe recommendations */}
                     {recipes && recipes.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
@@ -485,7 +537,7 @@ export default function Home() {
                                   {recipe.regionRelevance}
                                 </p>
                               )}
-                              <button 
+                              <button
                                 onClick={() => getRecipeDetail(recipe.name)}
                                 className="text-sm text-blue-500 hover:underline"
                               >
@@ -500,7 +552,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            
+
             {/* Action buttons */}
             <div className="p-4 flex justify-between">
               <div className="flex gap-2">
@@ -516,15 +568,15 @@ export default function Home() {
                 >
                   重选
                 </button>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   ref={fileInputRef}
                   onChange={handleFileSelect}
                   accept="image/*"
                   className="hidden"
                 />
               </div>
-              
+
               {!selectedRecipe && (
                 <button
                   onClick={analyzeVegetable}
@@ -538,7 +590,7 @@ export default function Home() {
           </>
         )}
       </div>
-      
+
       <canvas ref={canvasRef} className="hidden"></canvas>
     </div>
   );
