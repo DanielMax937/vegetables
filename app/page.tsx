@@ -268,14 +268,17 @@ export default function Home() {
         {!photo ? (
           <>
             <div className="relative aspect-[4/3] bg-black">
-              {cameraActive ? (
-                <video 
+            <video 
                   ref={videoRef} 
                   autoPlay 
                   playsInline 
                   className="w-full h-full object-cover"
+                  style={{
+                    display: cameraActive ? 'block' : 'none',
+                  }}
                 />
-              ) : (
+              {!cameraActive && 
+              (
                 <div className="w-full h-full flex items-center justify-center text-white">
                   {error ? error : "拍照或从相册选择食材图片"}
                 </div>
