@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import FirecrawlApp from '@mendable/firecrawl-js';
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import FirecrawlApp from "@mendable/firecrawl-js";
 
 const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY });
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL
+  apiKey: process.env.OPENAI_API_KEY_HOST,
+  baseURL: process.env.OPENAI_BASE_URL,
 });
 
 // Serper API key
@@ -18,10 +18,7 @@ export async function POST(request: Request) {
     const { recipeName } = await request.json();
 
     if (!recipeName) {
-      return NextResponse.json(
-        { error: '需要食谱名称' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "需要食谱名称" }, { status: 400 });
     }
 
     // Use Serper API to search for recipe
@@ -35,10 +32,10 @@ export async function POST(request: Request) {
         const recipeData = await crawlXiachufangRecipe(xiachufangUrl);
         return NextResponse.json({
           ...recipeData,
-          source: xiachufangUrl
+          source: xiachufangUrl,
         });
       } catch (crawlError) {
-        console.error('Error crawling xiachufang:', crawlError);
+        console.error("Error crawling xiachufang:", crawlError);
         // Fall back to LLM if crawling fails
       }
     }
@@ -60,11 +57,11 @@ export async function POST(request: Request) {
             "tips": ["小贴士1", "小贴士2", ...]
           }
           
-          请确保步骤清晰、详细，并包含有用的烹饪小贴士。`
-        }
+          请确保步骤清晰、详细，并包含有用的烹饪小贴士。`,
+        },
       ],
       max_tokens: 4000,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
 
     const recipeDetailText = response.choices[0]?.message?.content || "{}";
@@ -73,18 +70,18 @@ export async function POST(request: Request) {
       const recipeDetail = JSON.parse(recipeDetailText);
       return NextResponse.json(recipeDetail);
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      return NextResponse.json({
-        error: '无法解析食谱详情',
-        rawResponse: recipeDetailText
-      }, { status: 500 });
+      console.error("Error parsing OpenAI response:", parseError);
+      return NextResponse.json(
+        {
+          error: "无法解析食谱详情",
+          rawResponse: recipeDetailText,
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error('Error getting recipe details:', error);
-    return NextResponse.json(
-      { error: '获取食谱详情失败' },
-      { status: 500 }
-    );
+    console.error("Error getting recipe details:", error);
+    return NextResponse.json({ error: "获取食谱详情失败" }, { status: 500 });
   }
 }
 
@@ -93,14 +90,14 @@ function findXiachufangUrl(searchResults: any): string | null {
   try {
     if (searchResults?.organic) {
       for (const result of searchResults.organic) {
-        if (result.link && result.link.includes('xiachufang.com')) {
+        if (result.link && result.link.includes("xiachufang.com")) {
           return result.link;
         }
       }
     }
     return null;
   } catch (error) {
-    console.error('Error finding xiachufang URL:', error);
+    console.error("Error finding xiachufang URL:", error);
     return null;
   }
 }
@@ -112,17 +109,17 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.status}`);
     }
-    
+
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-    
+    const base64 = buffer.toString("base64");
+
     // Get the content type from the response
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+
     return `data:${contentType};base64,${base64}`;
   } catch (error) {
-    console.error('Error converting image to base64:', error);
+    console.error("Error converting image to base64:", error);
     return null;
   }
 }
@@ -134,12 +131,12 @@ async function crawlXiachufangRecipe(url: string) {
     const crawlResponse = await app.crawlUrl(url, {
       limit: 100,
       scrapeOptions: {
-        formats: ['markdown', 'html'],
-      }
-    })
+        formats: ["markdown", "html"],
+      },
+    });
 
     if (!crawlResponse.success) {
-      throw new Error(`Failed to crawl: ${crawlResponse.error}`)
+      throw new Error(`Failed to crawl: ${crawlResponse.error}`);
     }
 
     const firecrawlData = crawlResponse.data[0].markdown;
@@ -166,11 +163,11 @@ async function crawlXiachufangRecipe(url: string) {
               ...
             ],
             "tips": ["小贴士1", "小贴士2", ...]
-          }`
-        }
+          }`,
+        },
       ],
       max_tokens: 4000,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
 
     const extractedDataText = llmResponse.choices[0]?.message?.content || "{}";
@@ -193,12 +190,12 @@ async function crawlXiachufangRecipe(url: string) {
       // Convert all image URLs to base64
       const stepImagesPromises = stepImagesUrls.map(imageUrlToBase64);
       const stepImages = await Promise.all(stepImagesPromises);
-      
+
       // Get cover image from Firecrawl data if available
       let coverImageUrl = null;
       // If there's at least one step image, use the first one as cover
       if (stepImages.length > 0) {
-        coverImageUrl = stepImages[stepImages.length-1];
+        coverImageUrl = stepImages[stepImages.length - 1];
       }
 
       return {
@@ -207,13 +204,16 @@ async function crawlXiachufangRecipe(url: string) {
         ingredients: extractedData.ingredients,
         steps: formattedSteps,
         stepImages: stepImages, // Filter out any null values
-        tips: extractedData.tips && extractedData.tips.length > 0 ? extractedData.tips : ["暂无小贴士"]
+        tips:
+          extractedData.tips && extractedData.tips.length > 0
+            ? extractedData.tips
+            : ["暂无小贴士"],
       };
     } catch (parseError) {
-      console.error('Error parsing LLM extraction response:', parseError);
+      console.error("Error parsing LLM extraction response:", parseError);
 
       // Fallback to basic extraction from Firecrawl data
-      const name = '';
+      const name = "";
       const ingredients: any[] = [];
       const steps: any[] = [];
       const tips: any[] = [];
@@ -223,11 +223,11 @@ async function crawlXiachufangRecipe(url: string) {
         imageUrl: null,
         ingredients,
         steps,
-        tips: tips.length > 0 ? tips : ["暂无小贴士"]
+        tips: tips.length > 0 ? tips : ["暂无小贴士"],
       };
     }
   } catch (error) {
-    console.error('Error crawling xiachufang recipe:', error);
+    console.error("Error crawling xiachufang recipe:", error);
     throw error;
   }
 }
@@ -237,36 +237,36 @@ async function searchRecipeWithSerper(recipeName: string) {
   try {
     const payload = [
       {
-        "q": recipeName  + ' 食谱 做法 步骤 site: xiachufang.com',
-        "location": "China",
-        "gl": "cn",
-        "hl": "zh-cn"
+        q: recipeName + " 食谱 做法 步骤 site: xiachufang.com",
+        location: "China",
+        gl: "cn",
+        hl: "zh-cn",
       },
     ];
 
     const options = {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'X-API-KEY': serperApiKey || '',
-        'Content-Type': 'application/json'
+        "X-API-KEY": serperApiKey || "",
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     };
 
-    const response = await fetch('https://google.serper.dev/search', options)
-    const data = await response.json()
+    const response = await fetch("https://google.serper.dev/search", options);
+    const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error searching with Serper:', error);
+    console.error("Error searching with Serper:", error);
     // Return fallback data in case of error
     return {
       organic: [
         {
           title: `${recipeName}的做法`,
           snippet: `${recipeName}是一道美味的菜肴，主要原料包括...`,
-          link: 'https://example.com/recipe'
-        }
-      ]
+          link: "https://example.com/recipe",
+        },
+      ],
     };
   }
 }

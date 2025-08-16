@@ -1,26 +1,23 @@
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL
+  apiKey: process.env.OPENAI_API_KEY_HOST,
+  baseURL: process.env.OPENAI_BASE_URL,
 });
 
 export async function POST(request: Request) {
   try {
     const { image } = await request.json();
-    
+
     if (!image) {
-      return NextResponse.json(
-        { error: '需要图片数据' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "需要图片数据" }, { status: 400 });
     }
-    
+
     // Remove the data URL prefix to get just the base64 data
-    const base64Image = image.split(',')[1];
-    
+    const base64Image = image.split(",")[1];
+
     // Call OpenAI API to analyze the image
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -28,8 +25,8 @@ export async function POST(request: Request) {
         {
           role: "user",
           content: [
-            { 
-              type: "text", 
+            {
+              type: "text",
               text: `首先判断这张图片是否包含食物（蔬菜、水果或肉类）。
               如果不是食物图片，请返回以下JSON格式：
               {
@@ -51,7 +48,7 @@ export async function POST(request: Request) {
               - 好的特征可能包括："淡红色"，"肉质紧实有弹性"
               - 不好的特征可能包括："褐红色"，"肉质发暗不新鲜"
               
-              请至少提供3个好的特征和3个不好的特征进行比较。` 
+              请至少提供3个好的特征和3个不好的特征进行比较。`,
             },
             {
               type: "image_url",
@@ -63,26 +60,26 @@ export async function POST(request: Request) {
         },
       ],
       max_tokens: 4000,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
-    
+
     const analysisText = response.choices[0]?.message?.content || "{}";
-    
+
     try {
       const analysis = JSON.parse(analysisText);
       return NextResponse.json(analysis);
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      return NextResponse.json({ 
-        error: '无法解析分析结果',
-        rawResponse: analysisText
-      }, { status: 500 });
+      console.error("Error parsing OpenAI response:", parseError);
+      return NextResponse.json(
+        {
+          error: "无法解析分析结果",
+          rawResponse: analysisText,
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error('Error analyzing image:', error);
-    return NextResponse.json(
-      { error: '分析图片失败' },
-      { status: 500 }
-    );
+    console.error("Error analyzing image:", error);
+    return NextResponse.json({ error: "分析图片失败" }, { status: 500 });
   }
 }

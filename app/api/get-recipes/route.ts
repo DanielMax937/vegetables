@@ -1,37 +1,36 @@
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL
+  apiKey: process.env.OPENAI_API_KEY_HOST,
+  baseURL: process.env.OPENAI_BASE_URL,
 });
 
 export async function POST(request: Request) {
   try {
     const { foodItem, location } = await request.json();
-    
+
     if (!foodItem) {
-      return NextResponse.json(
-        { error: '需要食材信息' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "需要食材信息" }, { status: 400 });
     }
-    
+
     // Get user's city from IP if not provided
-    let userLocation = location || '未知';
+    let userLocation = location || "未知";
     if (!location) {
       try {
-        const ipResponse = await fetch('https://ipapi.co/json/');
+        const ipResponse = await fetch("https://ipapi.co/json/");
         if (ipResponse.ok) {
           const ipData = await ipResponse.json();
-          userLocation = `${ipData.city || ''}, ${ipData.region || ''}, ${ipData.country_name || ''}`;
+          userLocation = `${ipData.city || ""}, ${ipData.region || ""}, ${
+            ipData.country_name || ""
+          }`;
         }
       } catch (error) {
-        console.error('Error getting location from IP:', error);
+        console.error("Error getting location from IP:", error);
       }
     }
-    
+
     // Call OpenAI API to get a single recipe recommendation based on food and location
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -52,30 +51,30 @@ export async function POST(request: Request) {
                 "regionRelevance": "简短说明为什么这道菜适合我所在的地区"
               }
             ]
-          }`
-        }
+          }`,
+        },
       ],
       max_tokens: 4000,
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
-    
+
     const recipesText = response.choices[0]?.message?.content || "{}";
-    
+
     try {
       const recipes = JSON.parse(recipesText);
       return NextResponse.json(recipes);
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      return NextResponse.json({ 
-        error: '无法解析食谱结果',
-        rawResponse: recipesText
-      }, { status: 500 });
+      console.error("Error parsing OpenAI response:", parseError);
+      return NextResponse.json(
+        {
+          error: "无法解析食谱结果",
+          rawResponse: recipesText,
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error('Error getting recipes:', error);
-    return NextResponse.json(
-      { error: '获取食谱失败' },
-      { status: 500 }
-    );
+    console.error("Error getting recipes:", error);
+    return NextResponse.json({ error: "获取食谱失败" }, { status: 500 });
   }
 }
